@@ -2,7 +2,6 @@ global:
   scrape_interval: 60s
   evaluation_interval: 60s
 
-# A scrape configuration containing exactly one endpoint to scrape.
 scrape_configs:
   - job_name: 'nodeexporter'
     scrape_interval: 60s
@@ -18,59 +17,3 @@ scrape_configs:
     scrape_interval: 60s
     static_configs:
       - targets: ['localhost:9090']
-
-  - job_name: 'blackbox-http'
-    metrics_path: /probe
-    params:
-      module: [http_2xx]
-    static_configs:
-      - targets:
-        - http://voron01.domain
-        - http://voron02.domain
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: uptime_check
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
-
-  - job_name: 'blackbox_exporter'  # collect blackbox exporter's operational metrics.
-    static_configs:
-      - targets: ['blackbox-exporter:9115']
-
-  - job_name: "klipper"
-    scrape_interval: 10s
-    metrics_path: /probe
-    static_configs:
-      - targets: [ 'voron-v2.domain:7125', 'micron.domain:7125', 'v400.domain:7125' ] # the klipper host
-    params:
-      modules: [ 
-        'process_stats',
-        'network_stats',
-        'system_info',
-        'job_queue',
-        'directory_info',
-        'printer_objects',
-        'history',
-      ]
-    # Enable API Key authentication.
-    # Only set one of `credentials` or `credentials_file`
-    # authorization:
-    #   type: APIKEY
-    #   credentials: '<apikey>'
-    #   credentials_file: `/path/to/private/apikey.txt`
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: klipper-exporter:9101 # host where the klipper-exporter is running
-
-  - job_name: 'klipper-exporter'
-    scrape_interval: 10s
-    metrics_path: /metrics
-    static_configs:
-      - targets: [ 'klipper-exporter:9101' ] # host where the klipper-exporter is running
-
