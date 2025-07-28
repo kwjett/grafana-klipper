@@ -1,0 +1,140 @@
+secrets:
+  grafana_admin_user:
+    file: ./secrets/grafana_admin_user
+  grafana_admin_passwd:
+    file: ./secrets/grafana_admin_passwd
+
+networks:
+  monitoring:
+
+volumes:
+    prometheus_data: {}
+
+services:
+  grafana:
+    container_name: grafana
+    image: grafana/grafana-oss
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    user: "${PUID}"
+    ports:
+      - 3000:3000
+    networks:
+      - monitoring
+    secrets:
+      - grafana_admin_passwd
+      - grafana_admin_user
+    environment:
+      - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource,grafana-clock-panel,natel-discrete-panel,grafana-piechart-panel
+      - GF_SECURITY_ADMIN_USER__FILE=/run/secrets/grafana_admin_user
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_passwd
+      - GF_ANALYTICS_ENABLED=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - ./data/grafana/data:/var/lib/grafana
+      - ./data/grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./data/grafana/provisioning:/etc/grafana/provisioning
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    networks:
+      - monitoring
+    #ports:
+    #  - 9090:9090
+    volumes:
+      - ./data/prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=180d'
+
+  nodeexporter:
+    image: prom/node-exporter:latest
+    container_name: nodeexporter
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    networks:
+      - monitoring
+    #ports:
+    #  - 9100:9100
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      #- /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+    restart: unless-stopped
+    #expose:
+    #  - 8080
+    networks:
+      - monitoring
+
+  blackbox-exporter:
+    image: quay.io/prometheus/blackbox-exporter:latest
+    container_name: blackbox-exporter
+    privileged: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    networks:
+      - monitoring
+    #ports:
+    #  - "9115:9115"
+    volumes:
+      - ./data/blackbox-exporter:/config
+    command: --config.file=/config/blackbox.yml
+
+  klipper-exporter:
+    container_name: klipper-exporter
+    image: ghcr.io/scross01/prometheus-klipper-exporter:latest
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    networks:
+      - monitoring
+    #ports:
+    #  - 9101:9101
